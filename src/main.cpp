@@ -1,208 +1,187 @@
-#include <Arduino.h> 
+#include <Arduino.h>
 #include <LiquidCrystal_I2C.h>
 
 #define I2C_SDA 21
 #define I2C_SCL 22
-#define Switch  15
-#define Led1 23
-#define Led2 19
-#define Led3 18
-#define Led4 5
-#define Led5 17
-#define Led6 16
-#define Led7 4
-#define Led8 0
+int ButtonPin = 35; //sw4
+int ButtonPin1 = 33; //sw6
+int ButtonPin2 = 2; //sw2
+int ButtonPin3 = 34; //sw3
 
-LiquidCrystal_I2C lcd(0x27, 16, 2); 
+int ledBrightness = 0;
+const int thresholdLow = 100;  
+const int thresholdHigh = 3995;
 
-int menuIndex = 0;  
-const int totalMenus = 6;  
+int P3Pin = 12;
+int P2Pin = 39;
+int P1Pin = 36;
 
-// กำหนดพอร์ต LED ทั้งหมดใน array เพื่อให้ง่ายต่อการควบคุม
-int leds[] = {Led1, Led2, Led3, Led4, Led5, Led6, Led7, Led8};
+// ตัวแปรสำหรับเก็บสถานะของปุ่ม
+bool button1State = false; // สถานะของปุ่มกดตัวที่ 1
+bool button2State = false; // สถานะของปุ่มกดตัวที่ 2
 
-void updateLCD() {
-  lcd.clear();
-  
-  switch(menuIndex) {
-    case 0:
-      lcd.setCursor(0, 0);
-      lcd.print("Menu 1");
-      break;
-    case 1:
-      lcd.setCursor(0, 0);
-      lcd.print("Menu 2");
-      break;
-    case 2:
-      lcd.setCursor(0, 0);
-      lcd.print("Menu 3");
-      break;
-    case 3:
-      lcd.setCursor(0, 0);
-      lcd.print("Menu 4");
-      break;
-    case 4:
-      lcd.setCursor(0, 0);
-      lcd.print("Menu 5");
-      break;
-    case 5:
-      lcd.setCursor(0, 0);
-      lcd.print("Menu 6");
-      break;
-  }
-}
 
-// ฟังก์ชันเปิด LED ทั้งหมด
-void ledsOn() {
-  for (int i = 0; i < 8; i++) {
-    digitalWrite(leds[i], HIGH);
-  }
-}
 
-// ฟังก์ชันปิด LED ทั้งหมด
-void ledsOff() {
-  for (int i = 0; i < 8; i++) {
-    digitalWrite(leds[i], LOW);
-  }
-}
+int LedPin[] = {23, 19, 18, 5, 17, 16, 4, 0,}; 
 
-void ledsBlinkAlternating() {
-  static unsigned long previousMillis = 0;
-  unsigned long currentMillis = millis();
-  const long interval = 500; // เวลาช่วงสลับ 500ms
+int ledPin0 = 23;
+int ledPin1 = 19;
+int ledPin2 = 18;
+int ledPin3 = 5;
+int ledPin4 = 17;
+int ledPin5 = 16;
+int ledPin6 = 4;
+int ledPin7 = 0;
 
-  if (currentMillis - previousMillis >= interval) {
-    previousMillis = currentMillis;
+LiquidCrystal_I2C lcd(0x27, 20, 4); // set the LCD address to 0x27 for a 16 chars and 2 line display
 
-    // สลับการเปิด/ปิด LED คู่/คี่
-    static bool toggle = false;  // ใช้ตัวแปร toggle เพื่อสลับสถานะ
+void setup(){
 
-    if (toggle) {
-      // เปิด LED คู่ (LED1, LED3, LED5, LED7) และปิด LED คี่ (LED2, LED4, LED6, LED8)
-      digitalWrite(Led1, HIGH);
-      digitalWrite(Led2, LOW);
-      digitalWrite(Led3, HIGH);
-      digitalWrite(Led4, LOW);
-      digitalWrite(Led5, HIGH);
-      digitalWrite(Led6, LOW);
-      digitalWrite(Led7, HIGH);
-      digitalWrite(Led8, LOW);
-    } else {
-      // เปิด LED คี่ (LED2, LED4, LED6, LED8) และปิด LED คู่ (LED1, LED3, LED5, LED7)
-      digitalWrite(Led1, LOW);
-      digitalWrite(Led2, HIGH);
-      digitalWrite(Led3, LOW);
-      digitalWrite(Led4, HIGH);
-      digitalWrite(Led5, LOW);
-      digitalWrite(Led6, HIGH);
-      digitalWrite(Led7, LOW);
-      digitalWrite(Led8, HIGH);
-    }
+pinMode(ledPin2, OUTPUT); 
 
-    toggle = !toggle;  // สลับสถานะ toggle
-  }
-}
-
-// ฟังก์ชันสว่างทีละดวงจาก LED1 ถึง LED8
-void ledsOneByOne() {
-  for (int i = 0; i < 8; i++) {
-    digitalWrite(leds[i], HIGH);
-    delay(200); // รอ 200 ms ก่อนที่จะไปดวงถัดไป
-    digitalWrite(leds[i], LOW);
-  }
-}
-
-// ฟังก์ชันเปิด LED เป็นคู่ (2 ดวงพร้อมกัน)
-void ledsOnInPairs() {
-  for (int i = 0; i < 8; i += 2) {
-    digitalWrite(leds[i], HIGH);
-    digitalWrite(leds[i + 1], HIGH);
-    delay(500); // เปิดคู่ละ 500 ms
-    digitalWrite(leds[i], LOW);
-    digitalWrite(leds[i + 1], LOW);
-  }
-}
-
-// ฟังก์ชันสว่างจาก LED1 ถึง LED8 แล้วดับจาก LED8 ถึง LED1
-void ledsSweep() {
-  // สว่างจาก LED1 ถึง LED8
-  for (int i = 0; i < 8; i++) {
-    digitalWrite(leds[i], HIGH);
-    delay(200); // รอ 200 ms
-  }
-  
-  // ดับจาก LED8 ถึง LED1
-  for (int i = 7; i >= 0; i--) {
-    digitalWrite(leds[i], LOW);
-    delay(200); // รอ 200 ms
-  }
-}
-
-// ฟังก์ชันกระพริบ LED ทั้งหมดพร้อมกัน
-void ledsBlinkAll() {
-  static unsigned long lastMillis = 0;
-  static bool ledState = false;
-  unsigned long currentMillis = millis();
-
-  if (currentMillis - lastMillis >= 500) {  // ทุกๆ 500ms
-    ledState = !ledState;  // สลับสถานะ LED
+pinMode(ButtonPin2, INPUT_PULLUP); // ตั้งปุ่มกดตัวที่ 1 เป็น input พร้อมเปิด pull-up resistor
+pinMode(ButtonPin3, INPUT_PULLUP);// ตั้งปุ่มกดตัวที่ 2 เป็น input พร้อมเปิด pull-up resistor
+pinMode(ledPin0, OUTPUT);  
+pinMode(ledPin3, OUTPUT);  
 
     for (int i = 0; i < 8; i++) {
-      digitalWrite(leds[i], ledState ? HIGH : LOW);
+    pinMode(LedPin[i], OUTPUT);
+  }
+  pinMode(ButtonPin, INPUT_PULLUP);
+  pinMode(ButtonPin1, INPUT_PULLUP);
+ lcd.init(I2C_SDA, I2C_SCL); // initialize the lcd to use user defined I2C pins
+ lcd.backlight();
+ lcd.setCursor(0,0);
+ lcd.print("Menu: 0");
+ delay(500);
+Serial.begin(9600);
+}
+
+
+void loop(){
+  static int menu = 0;  // ตัวแปรเก็บเมนูที่เลือก
+  int switchState = digitalRead(ButtonPin); 
+  int switchState1 = digitalRead(ButtonPin1);
+  
+
+  int potValue = analogRead(P2Pin); //P2
+  int potValue1 = analogRead(P3Pin); //P3
+  int potValue2 = analogRead(P1Pin); //P1
+  ledBrightness = map(potValue, 0, 4095, 0, 255);
+  potValue = analogRead(P2Pin);
+  potValue1 = analogRead(P3Pin);
+  potValue2 = analogRead(P1Pin);
+  
+  
+    
+    if (switchState == HIGH) {
+    delay(300);  // ให้เวลา Debouncing ให้สวิตช์มีเวลาหยุดสักนิด
+
+    // เปลี่ยนเมนูที่เลือก
+    menu = (menu % 6) + 1;  // สลับเมนูจาก 1-3
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Menu: ");
+    lcd.print(menu);  // แสดงเมนูที่เลือก
+    delay(500);  // ให้เวลาสำหรับแสดงผลบนจอ LCD
     }
 
-    lastMillis = currentMillis;
-  }
-}
+    else if (switchState1 == HIGH)
+    {
+    delay(300);  // ให้เวลา Debouncing ให้สวิตช์มีเวลาหยุดสักนิด
+    menu = (menu % 6) + 1;  // สลับเมนูจาก 1-3
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Menu: ");
+    lcd.print(menu);  // แสดงเมนูที่เลือก
+    delay(500);  // ให้เวลาสำหรับแสดงผลบนจอ LCD
+    }
+    
+    bool button1State = digitalRead(ButtonPin2) == LOW; 
+    bool button2State = digitalRead(ButtonPin3) == LOW;
 
-void setup() {
-  lcd.init(I2C_SDA, I2C_SCL); 
-  lcd.backlight();
+    
+    // ใช้ switch-case เพื่อจัดการการเลือกเมนู
+    switch (menu) {
+      case 1:
+    digitalWrite(ledPin5, HIGH);
+    delay(200);
+    digitalWrite(ledPin5, LOW);
+    delay(200);
+
+    }
+    switch (menu) {
+      case 2:
+    
+    digitalWrite(ledPin4, HIGH);
+    digitalWrite(ledPin6, LOW);
+    delay(500);
+    digitalWrite(ledPin6, HIGH);
+    digitalWrite(ledPin4, LOW);
+    delay(500);
+    }
+
+    switch (menu) {
+      case 3:
+      
+    if (potValue <= thresholdLow || potValue >= thresholdHigh) {
+    ledBrightness = 0; // LED ดับ
+  } else {
+    // แปลงค่า 0-4095 ให้เป็นช่วง 0-255 สำหรับควบคุม PWM
+    ledBrightness = map(potValue, thresholdLow, thresholdHigh, 0, 255);
+  }
+
+   analogWrite(ledPin2, ledBrightness);
+    delay(100);  
+    
+    }
+
+    switch (menu) {
+      case 4:
+    if (potValue1 >= 2120){
   
-  // กำหนดโหมดของพิน LED เป็น OUTPUT
-  for (int i = 0; i < 8; i++) {
-    pinMode(leds[i], OUTPUT);
+    digitalWrite(ledPin3, HIGH);
+    delay(10);
+
+  }else {
+    (potValue1 <= 2120);
+    digitalWrite(ledPin3, LOW);
+    delay(10);
   }
-
-  updateLCD();  
-  pinMode(Switch, INPUT_PULLUP);  
-}
-
-void loop() {
-  static bool lastSwitchState = HIGH;  
-  bool switchState = digitalRead(Switch); 
+  }
+  switch (menu) {
+      case 5:
+    if (button1State && button2State) {
   
-  // เมื่อกดสวิตช์ให้เปลี่ยนเมนู
-  if (switchState == LOW && lastSwitchState == HIGH) {
-    menuIndex = (menuIndex + 1) % totalMenus;  
-    updateLCD();  
-    delay(50);  // ใช้ delay เล็กน้อยเพื่อป้องกันการกดซ้ำเร็วเกินไป
+    digitalWrite(ledPin0, LOW);
+    digitalWrite(ledPin3, LOW);
+    delay(50);    
+  } 
+  else {
+    
+    digitalWrite(ledPin0, HIGH);
+    digitalWrite(ledPin3, HIGH); 
+    delay(500);    
+                 
+    digitalWrite(ledPin3, LOW);
+    digitalWrite(ledPin0, LOW);  
+    delay(500);                 
   }
-
-  // เลือกเมนูต่างๆ
-  switch(menuIndex) {
-    case 0:
-      ledsOn();  // เมนู 1 เปิด LED ทั้งหมด
-      break;
-    case 1:
-      ledsBlinkAlternating();  // เมนู 2 กระพริบ LED คู่/คี่ สลับกัน
-      break;
-    case 2:
-      ledsOneByOne();  // เมนู 3 สว่างทีละดวง
-      break;
-    case 3:
-      ledsOnInPairs();  // เมนู 4 เปิด LED คู่
-      break;
-    case 4:
-      ledsSweep();  // เมนู 5 สว่างจากดอกแรกไปดอกสุดท้ายแล้วดับกลับ
-      break;
-    case 5:
-      ledsBlinkAll();  // เมนู 6 กระพริบ LED ทั้งหมด
-      break;
-    default:
-      ledsOff();  // ปิด LED
-      break;
+ }
+ 
+ switch (menu) {
+      case 6:
+    if (potValue2 > 256){
+  
+    digitalWrite(ledPin5, HIGH);
+    delay(10);
+  }
+  else if (potValue2 < 256){
+  
+    digitalWrite(ledPin5, LOW);
+    delay(10);
   }
   
-  lastSwitchState = switchState;  
+ 
+ }
 }
